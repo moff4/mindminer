@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import time
-
+from traceback import format_exc as Trace
 from kframe import Plugin
 
 from .utils import Table, Row
@@ -17,8 +17,21 @@ class Miner(Plugin):
 		self.P.add_plugin(key="table",target=Table,autostart=False)
 		self.P.add_plugin(key="row",target=Row,autostart=False)
 
-		self.map = self.P.init_plugin(key="table",n_i=self.n_i,i_n=self.i_n)
+		self.map = self.P.init_plugin(key="table")
+		self.cache_map = {}
+		self.cache_count = 0
 
+	#
+	# do with time count
+	#
+	def do(self,target,desc=None,*args,**kwargs):
+		_t = time.time()
+		try:
+			target(*args,**kwargs)
+		except Exception as e:
+			self.Error("{desc} - {e}".format(desc=str(target) if desc is None else desc,e=e))
+			self.Debug("{desc} - {e}".format(desc=str(target) if desc is None else desc,e=Trace()))
+		self.Notify("{desc} {t} sec".format(desc=str(target) if desc is None else desc,t=time.time()-_t))
 
 	#
 	# return index of tag
@@ -43,26 +56,25 @@ class Miner(Plugin):
 	# fill map and convert-tables
 	#
 	def load(self):
-		_t = time.time()
-
 		res = self.P.sql.select_all(SELECT_COUNT_OF_TAGS)
 		if res is None:	
 			self.Error("SQL is unreachable")
 			return
 		self.count = res[0][0]
-
-		self.count = 1000
-
-		for row in self.P.sql.select(SELECT_MAPS):
-			src,dst = row
-			_is = self.get_or_add_tag(src)
-			_id = self.get_or_add_tag(dst)
-			if _is is None or _id is None:
+		for tag in self.P.sql.select(SELECT_MAPS):
+			tag = tag[0]
+			if self.get_or_add_tag(tag) is None:
 				break
+	
+	def smth(self):
+		for i in range(100):
+			for j in range(100):
+				if 0 < self.map[i][j] <= 1:
+					self.map[i][j] = 0
+		print("cache size: %s"%self.cache_count)
 
-		self.Notify("Loaded database: {} sec".format(time.time() - _t))
 
 	def start(self):
-		self.load()
-
+		self.do(self.load,desc="Load tags and indexs")
+		self.do(self.smth,desc="Smth")
 		self.P.stop()
