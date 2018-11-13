@@ -3,6 +3,8 @@
 import time
 
 from kframe import Plugin
+
+from .utils import Table, Row
 from .queries import *
 
 class Miner(Plugin):
@@ -11,6 +13,12 @@ class Miner(Plugin):
 		self.i_n   = {} # index -> name
 		self.count = 0  # count of tags
 		self._proc = 0.01 # procent of found tags
+
+		self.P.add_plugin(key="table",target=Table,autostart=False)
+		self.P.add_plugin(key="row",target=Row,autostart=False)
+
+		self.map = self.P.init_plugin(key="table",n_i=self.n_i,i_n=self.i_n)
+
 
 	#
 	# return index of tag
@@ -25,7 +33,7 @@ class Miner(Plugin):
 				self.n_i[tag] = l
 				self.i_n[l] = tag
 				if (l / self.count) >= self._proc:
-					self.Notify("found: %0.2f%"%(100.0 * l / self.count))
+					self.Notify("found: %0.1f%%"%(100.0 * l / self.count))
 					self._proc += 0.01
 		else:
 			l = self.n_i[tag]
@@ -38,13 +46,15 @@ class Miner(Plugin):
 		_t = time.time()
 
 		res = self.P.sql.select_all(SELECT_COUNT_OF_TAGS)
-		if res is None:
+		if res is None:	
 			self.Error("SQL is unreachable")
 			return
 		self.count = res[0][0]
 
+		self.count = 1000
+
 		for row in self.P.sql.select(SELECT_MAPS):
-			src,dst,weight = row
+			src,dst = row
 			_is = self.get_or_add_tag(src)
 			_id = self.get_or_add_tag(dst)
 			if _is is None or _id is None:
