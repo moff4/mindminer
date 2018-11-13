@@ -15,7 +15,6 @@ or not isnull(rank_p);
 '''
 
 SELECT_WEIGHT = '''
-
 SELECT (sum(weight_1) + sum(weight_2))/2
 FROM 
 (

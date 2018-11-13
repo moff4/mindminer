@@ -69,12 +69,16 @@ class Miner(Plugin):
 	def smth(self):
 		for i in range(100):
 			for j in range(100):
+				self.Notify("smth: %2.0f.%2.0f%%"%(i,j))
 				if 0 < self.map[i][j] <= 1:
 					self.map[i][j] = 0
 		print("cache size: %s"%self.cache_count)
 
 
 	def start(self):
+		# FIXME 
+		# add setup where create tables and move needed data to that tables
+		# to make search much faster + id == index 
 		self.do(self.load,desc="Load tags and indexs")
 		self.do(self.smth,desc="Smth")
 		self.P.stop()
