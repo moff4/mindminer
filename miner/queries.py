@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
 SELECT_MAPS = '''
-SELECT t1.id,t2.id,m.weight
+SELECT t1.id,t2.id,m.weight,m.timestamp
 FROM orb.tag_map m, 
 	work.tag t1, 
 	work.tag t2
-WHERE m.src_tag = t1.hashtag
+WHERE m.timestamp <= {timestamp}
+AND m.src_tag = t1.hashtag
 AND m.dst_tag = t2.hashtag
 AND 0 = (
 	SELECT count(*) as c
@@ -16,7 +17,7 @@ AND 0 = (
 		AND map.dst = t1.id )
 )
 ORDER BY m.timestamp DESC
-''' 
+''' # format(timestamp)
 
 INSERT_MAP = '''
 INSERT IGNORE INTO work.map 
@@ -27,7 +28,7 @@ VALUES
 
 SELECT_COUNT_OF_TAGS = '''
 SELECT count(*)
-FROM work.tag;
+FROM work.tag
 '''
 
 CREAT_WORK_TABLES = [ 

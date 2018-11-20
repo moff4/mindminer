@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import json
 import time
 from traceback import format_exc as Trace
 from kframe import Plugin
@@ -9,7 +9,10 @@ from .queries import *
 
 class Miner(Plugin):
 	def init(self):
-		pass
+		try:
+			self.timestamp = json.load(open('conf/internal.json'))['timestamp']
+		except Exception:
+			self.timestamp = 'unix_timestamp()'
 		
 	#
 	# do with time count
@@ -50,6 +53,10 @@ class Miner(Plugin):
 				if 't' not in cfg:
 					cfg['t'] = time.time()
 				self.Notify("done: %2.4f%% ends in %s"%((cfg['i']/cfg['count']) , ( time.ctime(time.time() + (((time.time()-cfg['t'])*cfg['count']) / cfg['i'])))))
+				if 'timestamp' in kwargs:
+					self.timestamp = kwargs['timestamp']
+					with open("conf/internal.json",'w') as f:
+						f.write(json.dumps({"timestamp":self.timestamp}))
 				az = []
 				return boo
 			else:
@@ -57,15 +64,16 @@ class Miner(Plugin):
 		az = []
 		cfg = {
 			'i': 0,
-			'count':int(self.P.sql.select_all('''SELECT count(*)/{} FROM orb.tag_map;'''.format(ADD_PER_LOOP))[0][0]),
+			'count':int(self.P.sql.select_all('''SELECT count(*)/{count} FROM orb.tag_map where timestamp <= {timestamp};'''.format(count=ADD_PER_LOOP,timestamp=self.timestamp))[0][0]),
 		}
-		for row in self.P.sql.select(SELECT_MAPS):
-			src,dst,weight = row
-			if src > dst:
-				dst , src = src, dst
-			if not update(az=az,cfg=cfg,src=min(src,dst),dst=max(src,dst),weight=weight):
-				break
-		update(az=az,cfg=cfg,dump=True,src=min(src,dst),dst=max(src,dst),weight=weight)
+		if cfg['count'] > 0:
+			for row in self.P.sql.select(SELECT_MAPS.format(timestamp=self.timestamp)):
+				src,dst,weight,timestamp = row
+				if src > dst:
+					dst , src = src, dst
+				if not update(az=az,cfg=cfg,src=min(src,dst),dst=max(src,dst),weight=weight,timestamp=timestamp):
+					break
+			update(az=az,cfg=cfg,dump=True,src=min(src,dst),dst=max(src,dst),weight=weight)
 
 	def start(self):
 		self.do(self.create_db,desc="Create work database")
