@@ -74,11 +74,11 @@ class Miner(Plugin):
 					self.map[i][j] = 0
 		print("cache size: %s"%self.cache_count)
 
+	def create_db(self):
+		self.P.sql.exec(???)
 
 	def start(self):
-		# FIXME 
-		# add setup where create tables and move needed data to that tables
-		# to make search much faster + id == index 
-		self.do(self.load,desc="Load tags and indexs")
-		self.do(self.smth,desc="Smth")
+		self.do(self.create_db,desc="Copy database")
+		# self.do(self.load,desc="Load tags and indexs")
+		# self.do(self.smth,desc="Smth")
 		self.P.stop()
