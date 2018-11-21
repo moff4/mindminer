@@ -2,11 +2,17 @@
 
 SELECT_MAPS = '''
 SELECT t1.id,t2.id,m.weight,m.timestamp
-FROM orb.tag_map m, 
+FROM 
+(
+	SELECT * 
+	FROM orb.tag_map
+	WHERE m.timestamp <= {timestamp}
+	AND m.timestamp >= {end_time}
+	ORDER BY id DESC
+) m, 
 	work.tag t1, 
 	work.tag t2
-WHERE m.timestamp <= {timestamp}
-AND m.src_tag = t1.hashtag
+WHERE m.src_tag = t1.hashtag
 AND m.dst_tag = t2.hashtag
 AND 0 = (
 	SELECT count(*) as c
@@ -16,8 +22,7 @@ AND 0 = (
 	OR ( map.src = t2.id
 		AND map.dst = t1.id )
 )
-ORDER BY m.timestamp DESC
-''' # format(timestamp)
+''' # format(timestamp,end_time,limit)
 
 INSERT_MAP = '''
 INSERT IGNORE INTO work.map 
@@ -29,6 +34,11 @@ VALUES
 SELECT_COUNT_OF_TAGS = '''
 SELECT count(*)
 FROM work.tag
+'''
+
+SELECT_COUNT_OF_MAPS = '''
+SELECT count(*)
+FROM work.map
 '''
 
 CREAT_WORK_TABLES = [ 
@@ -77,7 +87,5 @@ ENGINE = InnoDB
 DEFAULT CHARACTER SET = utf8;
 '''
 ]
-
-SELECT_MAPS
 
 
