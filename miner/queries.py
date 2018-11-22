@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 
+SELECT_MAP = '''
+SELECT id,src_tag,dst_tag
+FROM orb.tag_map
+ORDER BY id DESC;
+'''
+
 SELECT_MAPS = '''
 SELECT t1.id,t2.id,m.weight,m.timestamp
 FROM 

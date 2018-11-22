@@ -7,6 +7,8 @@ from kframe import Plugin
 from .utils import Table, Row
 from .queries import *
 
+DELETE_MAX_SIZE = 10**6
+
 class Miner(Plugin):
 	def init(self):
 		try:
@@ -51,78 +53,41 @@ class Miner(Plugin):
 		_c2 = self.P.sql.select_all(SELECT_COUNT_OF_TAGS)[0][0]
 		self.Notify("Added {} rows to work.tag".format(_c2 - _c1))
 
-	def create_map(self):
-		ADD_PER_LOOP = 10**4
-		def update(az,cfg,dump=False,**kwargs):
-			if all(map(lambda x:x in kwargs,['src','dst','weight'])):
-				az.append("({src},{dst},{weight})".format(**kwargs))
-			if (len(az) > ADD_PER_LOOP or dump) and len(az) > 0:
-				boo , res = self.P.sql.execute(INSERT_MAP.format(values=",".join(az)),commit=True)
-				if not boo:
-					return False
-				if 'timestamp' in kwargs and self.timestamp > kwargs['timestamp']:
-					self.timestamp = kwargs['timestamp']
-				cfg['i'] += len(az)
-				self.Notify("done: (%s) %2.4f%% ends in %2.2f seconds"%(
-					int(self.P.sql.select_all(SELECT_COUNT_OF_MAPS)[0][0]),
-					(cfg['i']/cfg['count']) , 
-					( (time.time()-cfg['t'] ) / cfg['i'] * cfg['count'] )
-				))
-				return True
-			else:
-				return None
-		az = []
-		cfg = {
-			'i': 0,
-			't':time.time(),
-			'count':int(self.P.sql.select_all('''
-				SELECT count(*) 
-				FROM orb.tag_map 
-				where timestamp <= {timestamp}
-				AND timestamp >= {end_time}
-				;'''.format(end_time=self.end_time,timestamp=self.timestamp))[0][0]),
-		}
-		boo = False
-		_c1 = self.P.sql.select_all(SELECT_COUNT_OF_MAPS)[0][0]
-		if cfg['count'] > 0:
-			self.Notify("Gonna check {count} rows".format(**cfg))
-			try:
-				while cfg['count'] > 0:
-					cfg['count'] = int(self.P.sql.select_all('''
-					SELECT count(*) 
-					FROM orb.tag_map 
-					where timestamp <= {timestamp}
-					AND timestamp >= {end_time}
-					;'''.format(end_time=self.end_time,timestamp=self.timestamp))[0][0])
-					for row in self.P.sql.select(SELECT_MAPS.format(timestamp=self.timestamp,end_time=self.end_time,limit=ADD_PER_LOOP)):
-						try:
-							src,dst,weight,timestamp = row
-							if src > dst:
-								dst , src = src, dst
-							res = update(az=az,cfg=cfg,src=min(src,dst),dst=max(src,dst),weight=weight,timestamp=timestamp)
-							if res == False:
-								break
-							elif res == True:
-								az = []
-						except KeyboardInterrupt:
-							self.Warring("Got KeyboardInterrupt ; stopping")
-							boo = True
-						if boo:
-							break
-			except Exception as e:
-				self.Error("create_db - loop: %s"%e)
-				self.Debug("create_db - loop: %s"%Trace())
-			update(az=az,cfg=cfg,dump=True)
-			_c2 = self.P.sql.select_all(SELECT_COUNT_OF_MAPS)[0][0]
-			self.Notify("add maps: {} new rows".format(_c2 - _c1))
-		else:
-			self.Notify("add maps: none new")
-
+	def delete_duples(self):
+		def delete(az,bz):
+			self.Notify("az={} , bz={}".format(len(az),len(bz)))
+			return
+			if len(bz) <= 0:
+				return
+			self.Notify("Gonna delete them!")
+			res = self.P.sql.execute('''
+				DELETE FROM orb.tag_map
+				WHERE id in ({values})
+			'''.format(values=",".join(bz)),commit=True)[0]
+			self.Notify("Result: {status}".format(status="success" if res else "failed"))
+		try:
+			c1 = self.P.sql.select_all("SELECT count(*) FROM orb.tag_map;")[0][0]
+			az = set()
+			bz = []
+			for row in self.P.sql.select(SELECT_MAP):
+				_id , src , dst = row
+				key = "@".join([src,dst])
+				if key in az:
+					bz.append(str(_id))
+				else:
+					az.add(key)
+				if len(bz) > DELETE_MAX_SIZE:
+					break
+		except KeyboardInterrupt:
+			pass
+		delete(az,bz)
+		c2 = self.P.sql.select_all("SELECT count(*) FROM orb.tag_map;")[0][0]
+		self.Notify("COUNT: c1={c1}, c2={c2}, res={res}".format(c1=c1,c2=c2,res=c2-c1))
 
 	def start(self):
 		try:
-			# self.do(self.create_db,desc="Create work database")
-			self.do(self.create_map,desc="Create map")
+			#self.do(self.create_db,desc="Create work database")
+			self.do(self.delete_duples,desc="Delete duplicates")
 		except KeyboardInterrupt:
 			self.Warring("Got KeyboardInterrupt ; stopping")
 		self.save_cfg()
