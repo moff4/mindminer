@@ -56,14 +56,13 @@ class Miner(Plugin):
 	def delete_duples(self):
 		def delete(az,bz):
 			self.Notify("az={} , bz={}".format(len(az),len(bz)))
-			return
 			if len(bz) <= 0:
 				return
 			self.Notify("Gonna delete them!")
 			res = self.P.sql.execute('''
 				DELETE FROM orb.tag_map
 				WHERE id in ({values})
-			'''.format(values=",".join(bz)),commit=True)[0]
+			'''.format(values=",".join(map(lambda x:str(x),bz))),commit=True)[0]
 			self.Notify("Result: {status}".format(status="success" if res else "failed"))
 		try:
 			c1 = self.P.sql.select_all("SELECT count(*) FROM orb.tag_map;")[0][0]
@@ -73,7 +72,7 @@ class Miner(Plugin):
 				_id , src , dst = row
 				key = "@".join([src,dst])
 				if key in az:
-					bz.append(str(_id))
+					bz.append(_id)
 				else:
 					az.add(key)
 				if len(bz) > DELETE_MAX_SIZE:
@@ -86,10 +85,10 @@ class Miner(Plugin):
 
 	def start(self):
 		try:
-			#self.do(self.create_db,desc="Create work database")
+			self.do(self.create_db,desc="Create work database")
 			self.do(self.delete_duples,desc="Delete duplicates")
 		except KeyboardInterrupt:
 			self.Warring("Got KeyboardInterrupt ; stopping")
-		self.save_cfg()
+		#self.save_cfg()
 		self.P.stop()
 
