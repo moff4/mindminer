@@ -4,7 +4,13 @@ from kframe.base import Plugin
 
 from .queries import *
 
+<<<<<<< HEAD
 class Router(Plugin):
+=======
+DELETE_MAX_SIZE = 10**6
+
+class Miner(Plugin):
+>>>>>>> bfae6f7267ddde0118a78c0df23f9a8aa74c393c
 	def init(self):
 		self.cache = {}
 		self.used = set()
@@ -52,8 +58,6 @@ class Router(Plugin):
 		print(len(az))
 		self.P.sql.execute('''INSERT IGNORE INTO work.graph (src,dst,weight) VALUES %s
 		''' % ','.join(az), commit=True)
-				
-
 
 	def _route(self, j, points):
 		been = set()
