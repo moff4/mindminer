@@ -8,7 +8,7 @@ or dst in ({points});
 # points - int,int,...,int
 
 SELECT_ALL_TAGS = '''
-SELECT t.hashtag, t.id
+SELECT t.hashtag, t.id, t.rank
 from work.tag t
 where hashtag in ('{tags}')
 '''
