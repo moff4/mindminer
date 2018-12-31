@@ -163,6 +163,8 @@ class Miner(Plugin):
         for i in post_tags:
             s.add(i)
         self.router.cache_tags([t for t in s])
+        if len(user_profile) <= 0 or len(post_profile) <= 0:
+            return None
         user_profile = {self.router.map_tag[tag] for tag in user_tags}
         post_profile = {self.router.map_tag[tag] for tag in post_tags}
         return sum([
