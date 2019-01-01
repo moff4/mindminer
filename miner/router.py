@@ -42,7 +42,7 @@ class Router(Plugin):
         if lll != len(self.used):
             self.Debug('Cached has {} points ({})', len(self.used), c)
 
-    # tags - list of str
+    # tags - iterible
     def cache_tags(self, tags):
         lll = len(self.map_tag)
         try:
@@ -68,21 +68,37 @@ class Router(Plugin):
 
     def insert_nearest(self, points):
         c = 0
+        k = 0
         cc = len(points) / 100
-        for i in points:
-            # az = []
-            self._get_near(i=i, points=points)
-            for j in points:
-                if j not in self.cache.get(i, {}):
-                    self.route(i, j, save=True)
-            c += 1
-            if c % 10 == 0:
-                self.Debug("left: %.2f %%" % (c / cc))
+        try:
+            for i in points:
+                self._get_near(i=i, points=points)
+                for j in points:
+                    if j not in self.cache.get(i, {}):
+                        self.route(i, j, save=True)
+                        k += 1
+                c += 1
+                if c % 10 == 0:
+                    self.Debug("left: %.2f %%" % (c / cc))
+        except KeyboardInterrupt:
+            self.Debug('saved {} new routes', k)
 
     def _route(self, j, points):
         best = None
         been = set()
-        self._get_near(i=j, points=[j])
+        i = points[0][0]
+        self._get_near(i=j, points=[j, i])
+        if j not in self.cache:
+            self.Debug('loops: none')
+            return best
+        if j in self.cache.get(i, {}):
+            self.Debug('loops: none')
+            return self.cache[i][j]
+        elif i in self.cache.get(j, {}):
+            self.Debug('loops: none')
+            return self.cache[j][i]
+        elif i == j:
+            raise ValueError('This should not happen')
         c = 0
         while len(points) > 0:
             c += 1
@@ -119,6 +135,8 @@ class Router(Plugin):
                 (i, 0.0)
             ]
         )
+        if weight is None:
+            return None
         if weight == 0.0:
             return 10**(-10)
         add(self.cache, i, j, weight)
