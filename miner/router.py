@@ -109,16 +109,10 @@ class Router(Plugin):
                     w = already_weight + self.cache[i][j][0]
                     if best is None or w < best:
                         best = w
-                        if self.cache[i][j][1]:
-                            self.Debug('loops: sure')
-                            break
                 elif i in self.cache.get(j, {}):
                     w = already_weight + self.cache[j][i][0]
                     if best is None or w < best:
                         best = w
-                        if self.cache[i][j][1]:
-                            self.Debug('loops: sure')
-                            break
                 elif i == j:
                     if best is None or already_weight < best:
                         best = already_weight
@@ -128,9 +122,10 @@ class Router(Plugin):
                         self.cache.get(i, {}).keys()
                     ):
                         w = already_weight + self.cache[i][pt][0]
-                        if best is None or w < best:
-                            points.append((pt, w))
-                            been.add(pt)
+                        if self.cache[i][pt][1] == 0:
+                            if best is None or w < best:
+                                points.append((pt, w))
+                        been.add(pt)
         self.Debug('loops: {}', c)
         return best
 
