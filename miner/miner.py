@@ -2,7 +2,6 @@
 
 import time
 import math
-from multiprocessing import Pool
 from kframe.base import Plugin
 
 from .router import Router
@@ -111,18 +110,16 @@ class Miner(Plugin):
         count = 10
         az = list(range(offset, offset + count))
         self.router.insert_nearest(az)
-        # az = [az[i * x:][:x] for i in range(P)]
-        # print(az)
-        # with Pool(5) as p:
-        #     p.map(self.router.insert_nearest, az)
+
+    def test_route(self):
+        x = self.router.route(10400, 152982)
+        self.Debug("ROUTER: X = %s" % x)
+        x = self.router.route(8234, 194358)
+        self.Debug("ROUTER: X = %s" % x)
 
     def start(self):
         _t = time.time()
-        # x = self.router.route(10400, 152982)
-        # x = self.router.route(8234, 194358)
-        # self.Debug("ROUTER: X = %s" % x)
-        # return
-        self.test_relevante()
+        self.test_route()
         self.Debug('time: {}', time.time() - _t)
         self.P.stop()
 

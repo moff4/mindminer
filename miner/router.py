@@ -31,9 +31,9 @@ class Router(Plugin):
                 bz = list(filter(lambda x: x not in self.used, points))
                 if len(bz) > 0:
                     points = ",".join(list(map(lambda x: str(x), bz)))
-                    for src, dst, weight in self.P.sql.select(SELECT_ALL_NEAR_POINTS.format(points=points)):
-                        add(self.cache, src, dst, weight)
-                        add(self.cache, dst, src, weight)
+                    for src, dst, weight, sure in self.P.sql.select(SELECT_ALL_NEAR_POINTS.format(points=points)):
+                        add(self.cache, src, dst, (weight, sure))
+                        add(self.cache, dst, src, (weight, sure))
                         c += 1
                     for i in bz:
                         self.used.add(i)
@@ -92,11 +92,11 @@ class Router(Plugin):
             self.Debug('loops: none')
             return best
         if j in self.cache.get(i, {}):
-            self.Debug('loops: none')
-            return self.cache[i][j]
+            self.Debug('loops: z1')
+            return self.cache[i][j][0]
         elif i in self.cache.get(j, {}):
-            self.Debug('loops: none')
-            return self.cache[j][i]
+            self.Debug('loops: z2')
+            return self.cache[j][i][0]
         elif i == j:
             raise ValueError('This should not happen')
         c = 0
@@ -106,13 +106,19 @@ class Router(Plugin):
             if best is None or already_weight < best:
                 self._get_near(i=i, points=[i] + list(map(lambda x: x[0], points)))
                 if j in self.cache.get(i, {}):
-                    w = already_weight + self.cache[i][j]
+                    w = already_weight + self.cache[i][j][0]
                     if best is None or w < best:
                         best = w
+                        if self.cache[i][j][1]:
+                            self.Debug('loops: sure')
+                            break
                 elif i in self.cache.get(j, {}):
-                    w = already_weight + self.cache[j][i]
+                    w = already_weight + self.cache[j][i][0]
                     if best is None or w < best:
                         best = w
+                        if self.cache[i][j][1]:
+                            self.Debug('loops: sure')
+                            break
                 elif i == j:
                     if best is None or already_weight < best:
                         best = already_weight
@@ -121,7 +127,7 @@ class Router(Plugin):
                         lambda x: x not in been,
                         self.cache.get(i, {}).keys()
                     ):
-                        w = already_weight + self.cache[i][pt]
+                        w = already_weight + self.cache[i][pt][0]
                         if best is None or w < best:
                             points.append((pt, w))
                             been.add(pt)
@@ -139,14 +145,15 @@ class Router(Plugin):
             return None
         if weight == 0.0:
             return 10**(-10)
-        add(self.cache, i, j, weight)
-        add(self.cache, j, i, weight)
+        add(self.cache, i, j, (weight, 1))
+        add(self.cache, j, i, (weight, 1))
         if save:
             self.P.sql.execute(
                 INSERT_WEIGHT_REWRITE.format(
                     i=i,
                     j=j,
-                    weight=weight
+                    weight=weight,
+                    sure=1
                 ),
                 commit=True,
             )
