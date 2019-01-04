@@ -56,7 +56,8 @@ class Router(Plugin):
                     )
                 )
             ):
-                tag = tag.decode()
+                if type(tag) != str:
+                    tag = tag.decode()
                 self.map_tag[tag] = (_id, rank)
                 self.map_id[_id] = (tag, rank)
             self._get_near(None, self.map_id.keys())
@@ -66,20 +67,20 @@ class Router(Plugin):
         if lll != len(self.map_tag):
             self.Debug('Cached has {} tags', len(self.map_tag))
 
-    def insert_nearest(self, points):
-        c = 0
+    def insert_nearest(self):
         k = 0
-        cc = len(points) / 100
+        c = 0
         try:
-            for i in points:
-                self._get_near(i=i, points=points)
-                for j in points:
+            for i, count in self.P.sql.select(SELECT_ALL_FAR_POINTS.format(limit=1)):
+                self._get_near(i=i, points=[i])
+                self._get_near(i=None, points=self.cache.keys())
+                points = list(self.cache.keys())
+                for j in filter(lambda j: j != i, points):
                     if j not in self.cache.get(i, {}):
                         self.route(i, j, save=True)
                         k += 1
-                c += 1
-                if c % 10 == 0:
-                    self.Debug("left: %.2f %%" % (c / cc))
+                    c += 1
+                    self.Debug('done %.2f' % (c / len(points) * 100.0))
         except KeyboardInterrupt:
             self.Debug('saved {} new routes', k)
 
@@ -89,13 +90,11 @@ class Router(Plugin):
         i = points[0][0]
         self._get_near(i=j, points=[j, i])
         if j not in self.cache:
-            self.Debug('loops: none')
             return best
+        near_pt = set(self.cache[j].keys())
         if j in self.cache.get(i, {}):
-            self.Debug('loops: z1')
             return self.cache[i][j][0]
         elif i in self.cache.get(j, {}):
-            self.Debug('loops: z2')
             return self.cache[j][i][0]
         elif i == j:
             raise ValueError('This should not happen')
@@ -121,10 +120,13 @@ class Router(Plugin):
                         lambda x: x not in been,
                         self.cache.get(i, {}).keys()
                     ):
-                        w = already_weight + self.cache[i][pt][0]
-                        if self.cache[i][pt][1] == 0:
+                        if pt in near_pt:
+                            w = already_weight + self.cache[i][pt][0] + self.cache[j][pt][0]
                             if best is None or w < best:
-                                points.append((pt, w))
+                                best = w
+                        w = already_weight + self.cache[i][pt][0]
+                        if best is None or w < best:
+                            points.append((pt, w))
                         been.add(pt)
         self.Debug('loops: {}', c)
         return best
@@ -155,6 +157,4 @@ class Router(Plugin):
         return weight
 
     def rank(self, point):
-        if point in self.map_id:
-            return self.map_id[point][1]
-        raise ValueError('Tag was not loaded yet')
+        return self.map_id[point][1] if point in self.map_id else None

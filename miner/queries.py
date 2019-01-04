@@ -7,6 +7,15 @@ or dst in ({points});
 '''
 # points - int,int,...,int
 
+SELECT_ALL_FAR_POINTS = '''
+SELECT dst, count(*) as c
+FROM work.graph
+group by dst
+order by c
+limit {limit}
+'''
+# limit - int
+
 SELECT_ALL_TAGS = '''
 SELECT t.hashtag, t.id, t.rank
 from work.tag t

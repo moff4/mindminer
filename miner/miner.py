@@ -30,11 +30,12 @@ class Miner(Plugin):
         c = 0
         for i in user_profile:
             _i = self.router.rank(i)
-            if _i > 0:
+            if _i is not None and _i > 0:
                 _i = math.log10(_i)
+                _s = 0.0
                 for j in post_profile:
                     _j = self.router.rank(j)
-                    if _j > 0:
+                    if _j is not None and _j > 0:
                         _j = math.log10(_j)
                         w = self.router.route(
                             i=i,
@@ -44,7 +45,8 @@ class Miner(Plugin):
                         )
                         if w is not None:
                             c += 1
-                            s += _i * _j / w
+                            _s += _j / w
+                s += _i * _s
         return (s / c) if c > 0 else 0.0
 
     def test_relevante(self):
@@ -106,20 +108,27 @@ class Miner(Plugin):
             self.Debug("relevante {} - {}", i[0], i[2])
 
     def test_nearest(self):
-        offset = 100
-        count = 10
-        az = list(range(offset, offset + count))
-        self.router.insert_nearest(az)
+        self.router.insert_nearest()
 
     def test_route(self):
-        x = self.router.route(10400, 152982)
-        self.Debug("ROUTER: X = %s" % x)
-        x = self.router.route(8234, 194358)
-        self.Debug("ROUTER: X = %s" % x)
+        pts = {
+            8513, 16456, 20047, 20060, 21618, 22832, 36453, 44341,
+            44360, 82084, 85589, 114302, 143558, 174841, 176703, 193648, 210804
+        }
+        for i in pts:
+            for j in pts:
+                x = self.router.route(i, j, save=True)
+                self.Debug("ROUTER: X({},{}) = %s" % x, i, j)
+        # x = self.router.route(10400, 152982, save=False)
+        # self.Debug("ROUTER: X = %s" % x)
+        # x = self.router.route(8234, 194358, save=False)
+        # self.Debug("ROUTER: X = %s" % x)
 
     def start(self):
         _t = time.time()
+        # self.test_relevante()
         self.test_route()
+        # self.test_nearest()
         self.Debug('time: {}', time.time() - _t)
         self.P.stop()
 
