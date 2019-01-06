@@ -17,7 +17,7 @@ class Miner(Plugin):
         self.router.cache_tags(tags)
 
     # tags - dict: tag => weight
-    def relevante(self, user_tags, post_tags):
+    def relevante(self, user_tags, post_tags, flag=True):
         s = {i for i in user_tags}
         for i in post_tags:
             s.add(i)
@@ -31,12 +31,12 @@ class Miner(Plugin):
         for i in user_profile:
             _i = self.router.rank(i)
             if _i is not None and _i > 0:
-                _i = math.log10(_i)
+                _i = math.log10(_i + 1)
                 _s = 0.0
                 for j in post_profile:
                     _j = self.router.rank(j)
                     if _j is not None and _j > 0:
-                        _j = math.log10(_j)
+                        _j = math.log10(_j + 1)
                         w = self.router.route(
                             i=i,
                             j=j,
@@ -45,45 +45,53 @@ class Miner(Plugin):
                         )
                         if w is not None:
                             c += 1
-                            _s += _j / w
+                            ds = _j / w
+                            _s += ds * ds if flag else ds
                 s += _i * _s
-        return (s / c) if c > 0 else 0.0
+        w = s / c if c > 0 else 0.0
+        return math.sqrt(w) if flag else w
 
     def test_relevante(self):
         user_tags = {
-            'football': 2,
+            'football': 1,
             'фифа': 1,
             'fifa': 1,
         }
         post_tags = [
-            ('latex', {
-                'sex': 1,
-                'latex': 1,
-            }),
-            ('hentai', {
-                'hentai': 1,
-                'anime': 1,
-                'salormoon': 1,
-            }),
-            ('bdsm', {
-                'femdom': 1,
-                'bdsm': 1,
-            }),
-            ('cat', {
-                'кот': 1,
-                'котик': 1,
-            }),
-            ('music', {
-                'музыка': 1,
-                'music': 1,
-            }),
-            ('kpop', {
-                'kpop': 1,
-                'bts': 1,
-            }),
+            # ('latex', {
+            #     'sex': 1,
+            #     'latex': 1,
+            # }),
+            # ('hentai', {
+            #     'hentai': 1,
+            #     'anime': 1,
+            #     'salormoon': 1,
+            # }),
+            # ('bdsm', {
+            #     'femdom': 1,
+            #     'bdsm': 1,
+            # }),
+            # ('cat', {
+            #     'кот': 1,
+            #     'котик': 1,
+            # }),
+            # ('music', {
+            #     'музыка': 1,
+            #     'music': 1,
+            # }),
+            # ('kpop', {
+            #     'kpop': 1,
+            #     'bts': 1,
+            # }),
             ('fifa', {
                 'fifa': 1,
                 'футбол': 1,
+            }),
+            ('fifa more', {
+                'fifa': 1,
+                'футбол': 1,
+                'football': 1,
+                'kpop': 1,
             })
         ]
         az = []
@@ -96,7 +104,13 @@ class Miner(Plugin):
                 x[1],
                 self.relevante(
                     user_tags=user_tags,
-                    post_tags=x[1]
+                    post_tags=x[1],
+                    flag=False
+                ),
+                self.relevante(
+                    user_tags=user_tags,
+                    post_tags=x[1],
+                    flag=True
                 )
             ),
             post_tags
@@ -105,7 +119,7 @@ class Miner(Plugin):
             az,
             key=lambda x: x[2]
         ):
-            self.Debug("relevante {} - {}", i[0], i[2])
+            self.Debug("relevante {} - \nA {}\nS {}\n", i[0], i[2], i[3])
 
     def test_nearest(self):
         self.router.insert_nearest()
@@ -126,8 +140,8 @@ class Miner(Plugin):
 
     def start(self):
         _t = time.time()
-        # self.test_relevante()
-        self.test_route()
+        self.test_relevante()
+        # self.test_route()
         # self.test_nearest()
         self.Debug('time: {}', time.time() - _t)
         self.P.stop()
