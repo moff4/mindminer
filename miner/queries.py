@@ -1,3 +1,10 @@
+SELECT_ALL = '''
+SELECT src,dst,weight,sure
+from work.graph
+limit {offset}, {limit};
+'''
+# limit - int
+# offset - int
 
 SELECT_ALL_NEAR_POINTS = '''
 SELECT src,dst,weight,sure

@@ -167,8 +167,8 @@ class Miner(Plugin):
     def start(self):
         _t = time.time()
         # self.test_relevante()
-        self.test_route()
-        # self.test_nearest()
+        # self.test_route()
+        self.test_nearest()
         self.Debug('time: {}', time.time() - _t)
         self.P.stop()
 

@@ -34,7 +34,7 @@ class Router(Plugin):
         self.map_id = {}
         self.to_save = {}
 
-    def _get_near(self, i, points, limit=10000):
+    def _get_near(self, i, points, limit=10000, _all=False):
         lll = len(self.used)
         c = 0
         try:
@@ -42,13 +42,14 @@ class Router(Plugin):
             if i not in self.used:
                 bz = list(filter(lambda x: x not in self.used, points))
                 if len(bz) > 0:
+                    query = SELECT_ALL if _all else SELECT_ALL_NEAR_POINTS
                     points = ",".join(list(map(lambda x: str(x), bz)))
                     j = 0
                     x = limit
                     while (x == limit):
                         x = 0
                         for src, dst, weight, sure in self.P.sql.select(
-                            SELECT_ALL_NEAR_POINTS.format(
+                            query.format(
                                 points=points,
                                 limit=limit,
                                 offset=limit * j
@@ -60,12 +61,15 @@ class Router(Plugin):
                             x += 1
                         j += 1
                         c += x
-                    for i in bz:
-                        self.used.add(i)
+                    if _all:
+                        self.used = set(self.cache.keys())
+                    else:
+                        for i in bz:
+                            self.used.add(i)
         except Exception as e:
             self.Error('add near points: {}', e)
         if lll != len(self.used):
-            self.Debug('Cached has {} points ({}) in {}', len(self.used), c, time.time() - _t)
+            self.Debug('Cached has {} points ({}) in %.3f' % (time.time() - _t), len(self.used), c)
 
     # tags - iterible
     def cache_tags(self, tags):
@@ -100,7 +104,11 @@ class Router(Plugin):
             while len(points) > 0 and self.RUN:
                 i, already_weight = points.pop(0)
                 if i not in local_map or already_weight < local_map[i]:
-                    self._get_near(i=i, points=[i] + list(map(lambda x: x[0], points)))
+                    self._get_near(
+                        i=i,
+                        points=[i] + list(map(lambda x: x[0], points)),
+                        _all=True
+                    )
                     for pt in filter(
                         lambda x: self.cache[i][x][1] == 0,
                         self.cache.get(i, {}).keys()
