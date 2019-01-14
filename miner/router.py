@@ -126,7 +126,7 @@ class Router(Plugin):
                             points.append((pt, w))
                 c += 1
                 if c % 250 == 0:
-                    if len(points) > 2 * len(self.cache):
+                    if c % 1000 == 0 or len(points) >= len(self.cache):
                         points = self.__optimization(points)
                     self.Debug('loop {}, points {} ({})', c, len(points), len(points) - _lr)
                     _lr = len(points)
