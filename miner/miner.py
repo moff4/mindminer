@@ -122,17 +122,42 @@ class Miner(Plugin):
             self.Debug("relevante {} - \nA {}\nS {}\n", i[0], i[2], i[3])
 
     def test_nearest(self):
-        self.router.insert_nearest()
+        points = [
+            34155,
+            # 22173,
+            # 18519,
+            # 17817,
+            # 20517,
+            # 44341
+        ]
+        for i in points:
+            self.router.insert_nearest(
+                point=i
+            )
+            # self.router.reset()
+        self.router.save()
 
     def test_route(self):
         pts = {
-            8513, 16456, 20047, 20060, 21618, 22832, 36453, 44341,
-            44360, 82084, 85589, 114302, 143558, 174841, 176703, 193648, 210804
+            34155,
+            22173,
+            18519,
+            17817,
+            20517,
         }
+        j = 44341
+        _t = time.time()
         for i in pts:
-            for j in pts:
-                x = self.router.route(i, j, save=True)
-                self.Debug("ROUTER: X({},{}) = %s" % x, i, j)
+            x = self.router.route(i, j, save=False)
+            self.Debug("ROUTER: X({},{}) = %s" % x, i, j)
+        tx = time.time() - _t
+        _t = time.time()
+        y = self.router.route_many(j, dst=pts, save=False)
+        ty = time.time() - _t
+        for k in y:
+            self.Debug("ROUTER: Y({},{}) = %s" % y[k], k, j)
+        self.Debug('Tx = {}', tx)
+        self.Debug('Ty = {}', ty)
         # x = self.router.route(10400, 152982, save=False)
         # self.Debug("ROUTER: X = %s" % x)
         # x = self.router.route(8234, 194358, save=False)
@@ -140,9 +165,9 @@ class Miner(Plugin):
 
     def start(self):
         _t = time.time()
-        self.test_relevante()
+        # self.test_relevante()
         # self.test_route()
-        # self.test_nearest()
+        self.test_nearest()
         self.Debug('time: {}', time.time() - _t)
         self.P.stop()
 

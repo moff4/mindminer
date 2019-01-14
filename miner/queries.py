@@ -24,10 +24,11 @@ where hashtag in ('{tags}')
 # tags - str,str,..,str
 
 INSERT_WEIGHT_REWRITE = '''
-INSERT INTO work.graph (src,dst,weight,sure)
-VALUES ({i},{j},{weight},{sure}),({j},{i},{weight},{sure})
-ON DUPLICATE KEY UPDATE weight={weight};
+INSERT IGNORE INTO work.graph (src,dst,weight,sure)
+VALUES
+{values}
 '''
+# values - ({i},{j},{weight},{sure}),({j},{i},{weight},{sure})
 # i, j, weight, sure
 
 CONVERT_MAP_TO_GRAPH = '''
