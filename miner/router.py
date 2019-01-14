@@ -93,6 +93,13 @@ class Router(Plugin):
             self.Error('cache tags: {}', e)
             self.Debug('cache tags: {}', Trace())
 
+    def __optimization(self, points):
+        az = {}
+        for i, al in points:
+            if i not in az or az[i] > al:
+                az[i] = al
+        return [(i, az[i]) for i in az]
+
     def insert_nearest(self, point):
         points = [
             (point, 0.0)
@@ -119,6 +126,8 @@ class Router(Plugin):
                             points.append((pt, w))
                 c += 1
                 if c % 250 == 0:
+                    if len(points) > 2 * len(self.cache):
+                        points = self.__optimization(points)
                     self.Debug('loop {}, points {} ({})', c, len(points), len(points) - _lr)
                     _lr = len(points)
         except KeyboardInterrupt:
