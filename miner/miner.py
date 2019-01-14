@@ -17,7 +17,7 @@ class Miner(Plugin):
         self.router.cache_tags(tags)
 
     # tags - dict: tag => weight
-    def relevante(self, user_tags, post_tags, flag=True):
+    def relevante(self, user_tags, post_tags, flag=True, many=False):
         s = {i for i in user_tags}
         for i in post_tags:
             s.add(i)
@@ -40,7 +40,6 @@ class Miner(Plugin):
                         w = self.router.route(
                             i=i,
                             j=j,
-                            eps=True,
                             save=True
                         )
                         if w is not None:
@@ -151,9 +150,11 @@ class Miner(Plugin):
             x = self.router.route(i, j, save=False)
             self.Debug("ROUTER: X({},{}) = %s" % x, i, j)
         tx = time.time() - _t
+        self.router.reset()
         _t = time.time()
         y = self.router.route_many(j, dst=pts, save=False)
         ty = time.time() - _t
+        self.router.reset()
         for k in y:
             self.Debug("ROUTER: Y({},{}) = %s" % y[k], k, j)
         self.Debug('Tx = {}', tx)
@@ -166,8 +167,8 @@ class Miner(Plugin):
     def start(self):
         _t = time.time()
         # self.test_relevante()
-        # self.test_route()
-        self.test_nearest()
+        self.test_route()
+        # self.test_nearest()
         self.Debug('time: {}', time.time() - _t)
         self.P.stop()
 

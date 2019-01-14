@@ -3,9 +3,12 @@ SELECT_ALL_NEAR_POINTS = '''
 SELECT src,dst,weight,sure
 from work.graph
 where src in ({points})
-or dst in ({points});
+or dst in ({points})
+limit {offset}, {limit};
 '''
 # points - int,int,...,int
+# limit - int
+# offset - int
 
 SELECT_ALL_FAR_POINTS = '''
 SELECT dst, count(*) as c

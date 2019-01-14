@@ -34,7 +34,7 @@ class Router(Plugin):
         self.map_id = {}
         self.to_save = {}
 
-    def _get_near(self, i, points):
+    def _get_near(self, i, points, limit=10000):
         lll = len(self.used)
         c = 0
         try:
@@ -43,10 +43,20 @@ class Router(Plugin):
                 bz = list(filter(lambda x: x not in self.used, points))
                 if len(bz) > 0:
                     points = ",".join(list(map(lambda x: str(x), bz)))
-                    for src, dst, weight, sure in self.P.sql.select(SELECT_ALL_NEAR_POINTS.format(points=points)):
-                        add(self.cache, src, dst, (weight, sure))
-                        add(self.cache, dst, src, (weight, sure))
-                        c += 1
+                    j = 0
+                    x = limit
+                    while (x == limit):
+                        x = 0
+                        for src, dst, weight, sure in self.P.sql.select(SELECT_ALL_NEAR_POINTS.format(
+                            points=points,
+                            limit=limit,
+                            offset=limit * j
+                        )):
+                            add(self.cache, src, dst, (weight, sure))
+                            add(self.cache, dst, src, (weight, sure))
+                            x += 1
+                        j += 1
+                        c += x
                     for i in bz:
                         self.used.add(i)
         except Exception as e:
@@ -81,6 +91,7 @@ class Router(Plugin):
             (point, 0.0)
         ]
         c = 0
+        _lr = 0
         local_map = {}  # dst => weight
         try:
             while len(points) > 0 and self.RUN:
@@ -93,8 +104,9 @@ class Router(Plugin):
                             local_map[i] = w
                             points.append((pt, w))
                 c += 1
-                if c % 10 == 0:
-                    self.Debug('loop {}, points {}', c, len(points))
+                if c % 250 == 0:
+                    self.Debug('loop {}, points {} ({})', c, len(points), len(points) - _lr)
+                    _lr = len(points)
         except KeyboardInterrupt:
             self.Debug('gonna be inserted {} rows', len(local_map))
         i = point
@@ -121,6 +133,10 @@ class Router(Plugin):
         elif i in self.cache.get(j, {}):
             return self.cache[j][i][0], False
         elif i == j:
+            if j in self.cache.get(i, {}):
+                return self.cache[i][j][0], False
+            else:
+                return 1.0 / len(self.cache[i]), False
             raise ValueError('This should not happen')
         c = 0
         while len(points) > 0 and self.RUN:
@@ -141,7 +157,7 @@ class Router(Plugin):
                         best = already_weight
                 elif best is None or already_weight <= best:
                     for pt in filter(
-                        lambda x: x not in been and pt in near_pt,
+                        lambda x: x not in been and x in near_pt,
                         self.cache.get(i, {}).keys()
                     ):
                         w = already_weight + self.cache[i][pt][0] + self.cache[j][pt][0]
