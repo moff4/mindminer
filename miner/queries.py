@@ -34,7 +34,7 @@ where hashtag in ('{tags}')
 # tags - str,str,..,str
 
 INSERT_WEIGHT_REWRITE = '''
-INSERT IGNORE INTO work.graph (src,dst,weight,sure)
+INSERT INTO work.graph (src,dst,weight,sure)
 VALUES
 {values}
 ON DUPLICATE KEY UPDATE
