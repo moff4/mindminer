@@ -101,7 +101,10 @@ class Router(Plugin):
                 i, already_weight = points.pop(0)
                 if i not in local_map or already_weight < local_map[i]:
                     self._get_near(i=i, points=[i] + list(map(lambda x: x[0], points)))
-                    for pt in self.cache.get(i, {}).keys():
+                    for pt in filter(
+                        lambda x: self.cache[i][x][1] == 0,
+                        self.cache.get(i, {}).keys()
+                    ):
                         w = already_weight + self.cache[i][pt][0]
                         if (pt not in local_map or w < local_map[pt]) and (pt != point):
                             local_map[i] = w
