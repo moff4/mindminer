@@ -47,11 +47,14 @@ class Router(Plugin):
                     x = limit
                     while (x == limit):
                         x = 0
-                        for src, dst, weight, sure in self.P.sql.select(SELECT_ALL_NEAR_POINTS.format(
-                            points=points,
-                            limit=limit,
-                            offset=limit * j
-                        )):
+                        for src, dst, weight, sure in self.P.sql.select(
+                            SELECT_ALL_NEAR_POINTS.format(
+                                points=points,
+                                limit=limit,
+                                offset=limit * j
+                            ),
+                            unique_cursor=True
+                        ):
                             add(self.cache, src, dst, (weight, sure))
                             add(self.cache, dst, src, (weight, sure))
                             x += 1
@@ -278,11 +281,15 @@ class Router(Plugin):
                     az.append("({i},{j},{weight},{sure}),({j},{i},{weight},{sure})".format(
                         **self.to_save[key]
                     ))
-                self.P.sql.execute(
-                    INSERT_WEIGHT_REWRITE.format(
-                        values=','.join(az)
+                K = 10000
+                while len(az) > 0:
+                    bz = az[:K]
+                    self.P.sql.execute(
+                        INSERT_WEIGHT_REWRITE.format(
+                            values=','.join(bz)
+                        )
                     )
-                )
+                    az = az[K:]
                 self.Debug('saved {} rows', len(self.to_save))
                 self.to_save = {}
             except Exception as e:

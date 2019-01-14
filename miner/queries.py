@@ -30,6 +30,9 @@ INSERT_WEIGHT_REWRITE = '''
 INSERT IGNORE INTO work.graph (src,dst,weight,sure)
 VALUES
 {values}
+ON DUPLICATE KEY UPDATE
+`weight`=VALUES(`weight`),
+`sure`=VALUES(`sure`);
 '''
 # values - ({i},{j},{weight},{sure}),({j},{i},{weight},{sure})
 # i, j, weight, sure
