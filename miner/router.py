@@ -318,7 +318,8 @@ class Router(Plugin):
                     self.P.sql.execute(
                         INSERT_WEIGHT_REWRITE.format(
                             values=','.join(bz)
-                        )
+                        ),
+                        commit=True,
                     )
                     az = az[K:]
                 self.Debug('saved {} rows', len(self.to_save))
