@@ -98,7 +98,10 @@ class Router(Plugin):
         for i, al in points:
             if i not in az or az[i] > al:
                 az[i] = al
-        return [(i, az[i]) for i in az]
+        return sorted(
+            [(i, az[i]) for i in az],
+            key=lambda x: x[1]
+        )
 
     def insert_nearest(self, point):
         points = [
@@ -126,9 +129,17 @@ class Router(Plugin):
                             points.append((pt, w))
                 c += 1
                 if c % 250 == 0:
-                    if c % 1000 == 0 or len(points) >= len(self.cache):
+                    if len(points) >= len(self.cache):
                         points = self.__optimization(points)
-                    self.Debug('loop {}, points {} ({})', c, len(points), len(points) - _lr)
+                    r = len(points) - _lr
+                    self.Debug(
+                        'loop {}, points {} ({}{}) DB: {}',
+                        c,
+                        len(points),
+                        '+' if r >= 0 else '-',
+                        r,
+                        len(local_map)
+                    )
                     _lr = len(points)
         except KeyboardInterrupt:
             self.Debug('gonna be inserted {} rows', len(local_map))
