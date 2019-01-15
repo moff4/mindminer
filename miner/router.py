@@ -128,8 +128,8 @@ class Router(Plugin):
                             local_map[i] = w
                             points.append((pt, w))
                 c += 1
-                if c % 250 == 0:
-                    if len(points) >= len(self.cache):
+                if c % 1000 == 0:
+                    if len(points) >= 1.2 * len(self.cache):
                         points = self.__optimization(points)
                     r = len(points) - _lr
                     self.Debug(
@@ -137,7 +137,7 @@ class Router(Plugin):
                         c,
                         len(points),
                         '+' if r >= 0 else '-',
-                        r,
+                        abs(r),
                         len(local_map)
                     )
                     _lr = len(points)
