@@ -165,7 +165,7 @@ class Miner(Plugin):
         # self.Debug("ROUTER: X = %s" % x)
 
     def test_reachable(self):
-        res = self.router.test_reachable()
+        res = self.router.test_reachable(44341)
         if len(res) > 0:
             with open('res.json', 'w') as f:
                 f.write(json.dumps({'unreached': res}))
