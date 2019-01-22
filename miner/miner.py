@@ -176,7 +176,7 @@ class Miner(Plugin):
             with open('res.json') as f:
                 points = json.load(f)['unreached']
             self.P.sql.execute(
-                UPDATE_UNREACHABLE.format(pts=','.join(points)),
+                UPDATE_UNREACHABLE.format(pts=','.join([str(i) for i in points])),
                 commit=True,
             )
 

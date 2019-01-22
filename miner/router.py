@@ -125,7 +125,8 @@ class Router(Plugin):
                     self.cache[i].keys()
                 )
             if k % 1000 == 0:
-                self.Debug('reaching-test: points {} ({}) , reached: {}', len(points), lr, len(reached))
+                x = len(points) - lr
+                self.Debug('reaching-test: points {} ({}{}) , reached: {}', len(points), '+' if x > 0 else '-', abs(x), len(reached))
                 lr = len(points)
         return list(filter(lambda x: x not in reached, self.cache.keys()))
 
