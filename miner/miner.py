@@ -5,6 +5,7 @@ import math
 from kframe.base import Plugin
 
 from .router import Router
+from .queries import UPDATE_UNREACHABLE
 
 
 class Miner(Plugin):
@@ -164,19 +165,30 @@ class Miner(Plugin):
         # x = self.router.route(8234, 194358, save=False)
         # self.Debug("ROUTER: X = %s" % x)
 
-    def test_reachable(self):
-        res = self.router.test_reachable(44341)
-        if len(res) > 0:
-            with open('res.json', 'w') as f:
-                f.write(json.dumps({'unreached': res}))
-        self.Notify('unreached {} points', len(res))
+    def test_reachable(self, find=True, delete=False):
+        if find:
+            res = self.router.test_reachable(44341)
+            if len(res) > 0:
+                with open('res.json', 'w') as f:
+                    f.write(json.dumps({'unreached': res}))
+            self.Notify('unreached {} points', len(res))
+        if delete:
+            with open('res.json') as f:
+                points = json.load(f)['unreached']
+            self.P.sql.execute(
+                UPDATE_UNREACHABLE.format(pts=','.join(points)),
+                commit=True,
+            )
 
     def start(self):
         _t = time.time()
         # self.test_relevante()
         # self.test_route()
         # self.test_nearest()
-        self.test_reachable()
+        self.test_reachable(
+            find=False,
+            delete=True
+        )
         self.Debug('time: {}', time.time() - _t)
         self.P.stop()
 

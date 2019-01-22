@@ -56,3 +56,11 @@ UNION
     FROM work.map
 );
 '''
+
+UPDATE_UNREACHABLE = '''
+UPDATE work.graph
+SET sure = 3
+WHERE src in ({pts})
+or dst in ({pts})
+'''
+# pts - int,..,int
