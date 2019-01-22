@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import json
 import time
 import math
 from kframe.base import Plugin
@@ -164,11 +164,19 @@ class Miner(Plugin):
         # x = self.router.route(8234, 194358, save=False)
         # self.Debug("ROUTER: X = %s" % x)
 
+    def test_reachable(self):
+        res = self.router.test_reachable()
+        if len(res) > 0:
+            with open('res.json', 'w') as f:
+                f.write(json.dumps({'unreached': res}))
+        self.Notify('unreached {} points', len(res))
+
     def start(self):
         _t = time.time()
         # self.test_relevante()
         # self.test_route()
-        self.test_nearest()
+        # self.test_nearest()
+        self.test_reachable()
         self.Debug('time: {}', time.time() - _t)
         self.P.stop()
 

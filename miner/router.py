@@ -103,6 +103,26 @@ class Router(Plugin):
             key=lambda x: x[1]
         )
 
+    def test_reachable(self, point):
+        points = [
+            point
+        ]
+        self._get_near(
+            i=i,
+            points=[i] + list(map(lambda x: x[0], points)),
+            _all=True
+        )
+        reached = set()
+        while len(points) > 0 and self.RUN:
+            i = points.pop(0)
+            if i not in reached:
+                reached.add(i)
+                points += filter(
+                    lambda x: x not in reached,
+                    self.cache[i].keys()
+                )
+        return list(filter(lambda x: x not in reached, self.cache.keys()))
+
     def insert_nearest(self, point):
         points = [
             (point, 0.0)
