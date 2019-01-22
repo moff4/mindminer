@@ -122,12 +122,12 @@ class Miner(Plugin):
 
     def test_nearest(self):
         points = [
-            34155,
+            # 34155,
             # 22173,
             # 18519,
             # 17817,
             # 20517,
-            # 44341
+            44341,
         ]
         for i in points:
             self.router.insert_nearest(
