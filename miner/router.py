@@ -27,14 +27,7 @@ class Router(Plugin):
         self.RUN = True
         # self.P.sql.execute(CONVERT_MAP_TO_GRAPH, commit=True)
 
-    def reset(self):
-        self.cache = {}
-        self.used = set()
-        self.map_tag = {}
-        self.map_id = {}
-        self.to_save = {}
-
-    def _get_near(self, i, points, limit=10000, _all=False):
+    def _get_near(self, i, points, sure=None):
         lll = len(self.used)
         c = 0
         try:
@@ -42,37 +35,38 @@ class Router(Plugin):
             if i not in self.used:
                 bz = list(filter(lambda x: x not in self.used, points))
                 if len(bz) > 0:
-                    query = SELECT_ALL if _all else SELECT_ALL_NEAR_POINTS
-                    points = ",".join(list(map(lambda x: str(x), bz)))
-                    j = 0
-                    x = limit
-                    while (x == limit):
-                        x = 0
-                        for src, dst, weight, sure in self.P.sql.select(
-                            query.format(
-                                points=points,
-                                limit=limit,
-                                offset=limit * j
-                            ),
-                            unique_cursor=True
-                        ):
-                            add(self.cache, src, dst, (weight, sure))
-                            add(self.cache, dst, src, (weight, sure))
-                            x += 1
-                        j += 1
-                        c += x
-                    if _all:
-                        self.used = set(self.cache.keys())
-                    else:
-                        for i in bz:
-                            self.used.add(i)
+                    points = ','.join(list(map(lambda x: str(x), bz)))
+                    sure = ','.join(
+                        [
+                            str(j)
+                            for j in (
+                                sure
+                                if sure is not None else
+                                range(10)
+                            )
+                        ]
+                    )
+                    for src, dst, weight, sure in self.P.sql.select(
+                        SELECT_ALL_NEAR_POINTS.format(
+                            points=points,
+                            sure=sure,
+                        )
+                    ):
+                        add(self.cache, src, dst, (weight, sure))
+                        add(self.cache, dst, src, (weight, sure))
+                        c += 1
+                    for i in bz:
+                        self.used.add(i)
         except Exception as e:
             self.Error('add near points: {}', e)
         if lll != len(self.used):
-            self.Debug('Cached has {} points ({}) in %.3f' % (time.time() - _t), len(self.used), c)
+            self.Debug('Cached has {} points ({}) in {}', len(self.used), c, time.time() - _t)
 
-    # tags - iterible
     def cache_tags(self, tags):
+        """
+            tags - iterible
+            load tuples (hashtag, tag_id, rank)
+        """
         try:
             for tag, _id, rank in self.P.sql.select(
                 SELECT_ALL_TAGS.format(
@@ -93,99 +87,29 @@ class Router(Plugin):
             self.Error('cache tags: {}', e)
             self.Debug('cache tags: {}', Trace())
 
-    def __optimization(self, points):
-        az = {}
-        for i, al in points:
-            if i not in az or az[i] > al:
-                az[i] = al
-        return sorted(
-            [(i, az[i]) for i in az],
-            key=lambda x: x[1]
-        )
-
-    def test_reachable(self, point):
-        points = [
-            point
-        ]
-        self._get_near(
-            i=point,
-            points=points,
-            _all=True
-        )
+    def insert_nearest(self):
         k = 0
-        lr = 0
-        reached = set()
-        while len(points) > 0 and self.RUN:
-            i = points.pop(0)
-            k += 1
-            if i not in reached:
-                reached.add(i)
-                points += filter(
-                    lambda x: x not in reached,
-                    self.cache[i].keys()
-                )
-            if k % 1000 == 0:
-                x = len(points) - lr
-                self.Debug('reaching-test: points {} ({}{}) , reached: {}', len(points), '+' if x > 0 else '-', abs(x), len(reached))
-                lr = len(points)
-        return list(filter(lambda x: x not in reached, self.cache.keys()))
-
-    def insert_nearest(self, point):
-        points = [
-            (point, 0.0)
-        ]
         c = 0
-        _lr = 0
-        local_map = {}  # dst => weight
         try:
-            while len(points) > 0 and self.RUN:
-                i, already_weight = points.pop(0)
-                if i not in local_map or already_weight < local_map[i]:
-                    self._get_near(
-                        i=i,
-                        points=[i] + list(map(lambda x: x[0], points)),
-                        _all=True
-                    )
-                    for pt in filter(
-                        lambda x: self.cache[i][x][1] == 0,
-                        self.cache.get(i, {}).keys()
-                    ):
-                        w = already_weight + self.cache[i][pt][0]
-                        if (pt not in local_map or w < local_map[pt]) and (pt != point):
-                            local_map[i] = w
-                            points.append((pt, w))
-                c += 1
-                if c % 1000 == 0:
-                    if len(points) >= 1.2 * len(self.cache):
-                        points = self.__optimization(points)
-                    r = len(points) - _lr
-                    self.Debug(
-                        'loop {}, points {} ({}{}) DB: {}',
-                        c,
-                        len(points),
-                        '+' if r >= 0 else '-',
-                        abs(r),
-                        len(local_map)
-                    )
-                    _lr = len(points)
+            for i, count in self.P.sql.select(SELECT_ALL_FAR_POINTS.format(limit=1)):
+                self._get_near(i=i, points=[i])
+                self._get_near(i=None, points=self.cache.keys())
+                points = list(self.cache.keys())
+                for j in filter(lambda j: j != i, points):
+                    if j not in self.cache.get(i, {}):
+                        self.route(i, j, save=True)
+                        k += 1
+                    c += 1
+                    self.Debug('done %.2f' % (c / len(points) * 100.0))
         except KeyboardInterrupt:
-            self.Debug('gonna be inserted {} rows', len(local_map))
-        i = point
-        for j in local_map:
-            add(self.cache, i, j, (local_map[i], 1))
-            add(self.cache, j, i, (local_map[i], 1))
-            self.to_save[str(min(i, j)) + '@' + str(max(i, j))] = {
-                'i': i,
-                'j': j,
-                'weight': local_map[i],
-                'sure': 2
-            }
+            self.Debug('saved {} new routes', k)
 
-    def _route(self, j, points):
+    def _route(self, j, points, sure=None):
         best = None
-        been = set()
+        # been = set()
         i = points[0][0]
-        self._get_near(i=j, points=[j, i])
+        src = i
+        self._get_near(i=j, points=[j, i], sure=sure)
         if j not in self.cache:
             return None, False
         near_pt = set(self.cache[j].keys())
@@ -194,17 +118,13 @@ class Router(Plugin):
         elif i in self.cache.get(j, {}):
             return self.cache[j][i][0], False
         elif i == j:
-            if j in self.cache.get(i, {}):
-                return self.cache[i][j][0], False
-            else:
-                return 1.0 / len(self.cache[i]), False
             raise ValueError('This should not happen')
         c = 0
         while len(points) > 0 and self.RUN:
             c += 1
             i, already_weight = points.pop(0)
             if best is None or already_weight < best:
-                self._get_near(i=i, points=[i] + list(map(lambda x: x[0], points)))
+                self._get_near(i=i, points=[i] + list(map(lambda x: x[0], points)), sure=sure)
                 if j in self.cache.get(i, {}):
                     w = already_weight + self.cache[i][j][0]
                     if best is None or w < best:
@@ -217,30 +137,27 @@ class Router(Plugin):
                     if best is None or already_weight < best:
                         best = already_weight
                 elif best is None or already_weight <= best:
-                    for pt in filter(
-                        lambda x: x not in been and x in near_pt,
-                        self.cache.get(i, {}).keys()
-                    ):
-                        w = already_weight + self.cache[i][pt][0] + self.cache[j][pt][0]
-                        if best is None or w < best:
-                            best = w
-                    for pt in sorted(
-                        filter(
-                            lambda x: x not in been,
-                            self.cache.get(i, {}).keys()
-                        ),
-                        key=lambda x: already_weight + self.cache[i][x][0]
-                    ):
+                    for pt in self.cache.get(i, {}).keys():
+                        #  filter(
+                        #     lambda x: x not in been,
+                        #     self.cache.get(i, {}).keys()
+                        # ):
+                        if pt in near_pt:
+                            w = already_weight + self.cache[i][pt][0] + self.cache[j][pt][0]
+                            if best is None or w < best:
+                                best = w
                         w = already_weight + self.cache[i][pt][0]
                         if best is None or w < best:
                             points.append((pt, w))
-                        been.add(pt)
-        self.Debug('loops: {}', c)
+                        # been.add(pt)
+        self.Debug('loops {} -> {}: {}', self.map_id[src][0], self.map_id[j][0], c)
         return best, True
 
-    # desteny - list or tuple of pts
-    # return dict of weights and flag if there is need to save this data
     def _route_many(self, desteny, i):
+        """
+            desteny - list or tuple of pts
+            return dict of weights and flag if there is need to save this data
+        """
         res = {}
         been = set()
         self._get_near(i=None, points=[i] + list(desteny))
@@ -308,12 +225,13 @@ class Router(Plugin):
         dst, _ = self._route_many(desteny=dst, i=i)
         return dst
 
-    def route(self, i, j, save=True):
+    def route(self, i, j, save=True, sure=None):
         weight, _save = self._route(
             j=j,
             points=[
                 (i, 0.0)
-            ]
+            ],
+            sure=sure,
         )
         if weight is None:
             return None
@@ -339,16 +257,13 @@ class Router(Plugin):
                     az.append("({i},{j},{weight},{sure}),({j},{i},{weight},{sure})".format(
                         **self.to_save[key]
                     ))
-                K = 10000
-                while len(az) > 0:
-                    bz = az[:K]
-                    self.P.sql.execute(
-                        INSERT_WEIGHT_REWRITE.format(
-                            values=','.join(bz)
-                        ),
-                        commit=True,
+                self.P.sql.execute(
+                    INSERT_WEIGHT_REWRITE.format(
+                        values=','.join(
+                            az
+                        )
                     )
-                    az = az[K:]
+                )
                 self.Debug('saved {} rows', len(self.to_save))
                 self.to_save = {}
             except Exception as e:

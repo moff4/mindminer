@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-import json
-import time
+
 import math
+
 from kframe.base import Plugin
 
 from .router import Router
-from .queries import UPDATE_UNREACHABLE
 
 
 class Miner(Plugin):
@@ -17,20 +16,38 @@ class Miner(Plugin):
     def cache_tags(self, tags):
         self.router.cache_tags(tags)
 
+    def save(self):
+        self.router.save()
+
     # tags - dict: tag => weight
-    def relevante(self, user_tags, post_tags, flag=True, many=False):
-        s = {i for i in user_tags}
-        for i in post_tags:
-            s.add(i)
-        self.router.cache_tags([t for t in s])
-        user_profile = {self.router.map_tag[tag][0] for tag in filter(lambda x: x in self.router.map_tag, user_tags)}
-        post_profile = {self.router.map_tag[tag][0] for tag in filter(lambda x: x in self.router.map_tag, post_tags)}
-        if len(user_profile) <= 0 or len(post_profile) <= 0:
-            return None
+    def relevante(self, user_tags, post_tags, flag=True):
+        def f(tags):
+            return {tag: 1 for tag in tags} if isinstance(tags, tuple) or isinstance(tags, list) else tags
+
+        def q(tags):
+            return {
+                self.router.map_tag[tag][0]: tags[tag]
+                for tag in filter(
+                    lambda x: x in self.router.map_tag,
+                    tags
+                )
+            }
+
+        user_tags = f(user_tags)
+        post_tags = f(post_tags)
+        user_profile = q(user_tags)
+        post_profile = q(post_tags)
+        if not user_profile or not post_profile:
+            return 0.0
+
+        self.router.cache_tags(set(user_tags).union(set(post_tags)))
+
         s = 0.0
         c = 0
+        ut_s = sum(user_profile.values())
         for i in user_profile:
             _i = self.router.rank(i)
+            ut_w = user_profile[i]
             if _i is not None and _i > 0:
                 _i = math.log10(_i + 1)
                 _s = 0.0
@@ -41,156 +58,16 @@ class Miner(Plugin):
                         w = self.router.route(
                             i=i,
                             j=j,
-                            save=True
+                            save=True,
+                            sure={0, 1, 2},
                         )
                         if w is not None:
                             c += 1
                             ds = _j / w
-                            _s += ds * ds if flag else ds
-                s += _i * _s
+                            _s += ds * ds
+                s += _i * _s * ut_w / ut_s
         w = s / c if c > 0 else 0.0
-        return math.sqrt(w) if flag else w
+        return math.sqrt(w)
 
-    def test_relevante(self):
-        user_tags = {
-            'football': 1,
-            'фифа': 1,
-            'fifa': 1,
-        }
-        post_tags = [
-            # ('latex', {
-            #     'sex': 1,
-            #     'latex': 1,
-            # }),
-            # ('hentai', {
-            #     'hentai': 1,
-            #     'anime': 1,
-            #     'salormoon': 1,
-            # }),
-            # ('bdsm', {
-            #     'femdom': 1,
-            #     'bdsm': 1,
-            # }),
-            # ('cat', {
-            #     'кот': 1,
-            #     'котик': 1,
-            # }),
-            # ('music', {
-            #     'музыка': 1,
-            #     'music': 1,
-            # }),
-            # ('kpop', {
-            #     'kpop': 1,
-            #     'bts': 1,
-            # }),
-            ('fifa', {
-                'fifa': 1,
-                'футбол': 1,
-            }),
-            ('fifa more', {
-                'fifa': 1,
-                'футбол': 1,
-                'football': 1,
-                'kpop': 1,
-            })
-        ]
-        az = []
-        for tag in post_tags:
-            az += [t for t in tag[1].keys()]
-        self.router.cache_tags(az)
-        az = list(map(
-            lambda x: (
-                x[0],
-                x[1],
-                self.relevante(
-                    user_tags=user_tags,
-                    post_tags=x[1],
-                    flag=False
-                ),
-                self.relevante(
-                    user_tags=user_tags,
-                    post_tags=x[1],
-                    flag=True
-                )
-            ),
-            post_tags
-        ))
-        for i in sorted(
-            az,
-            key=lambda x: x[2]
-        ):
-            self.Debug("relevante {} - \nA {}\nS {}\n", i[0], i[2], i[3])
-
-    def test_nearest(self):
-        points = [
-            # 34155,
-            # 22173,
-            # 18519,
-            # 17817,
-            # 20517,
-            44341,
-        ]
-        for i in points:
-            self.router.insert_nearest(
-                point=i
-            )
-            # self.router.reset()
-        self.router.save()
-
-    def test_route(self):
-        pts = {
-            34155,
-            22173,
-            18519,
-            17817,
-            20517,
-        }
-        j = 44341
-        _t = time.time()
-        for i in pts:
-            x = self.router.route(i, j, save=False)
-            self.Debug("ROUTER: X({},{}) = %s" % x, i, j)
-        tx = time.time() - _t
-        self.router.reset()
-        _t = time.time()
-        y = self.router.route_many(j, dst=pts, save=False)
-        ty = time.time() - _t
-        self.router.reset()
-        for k in y:
-            self.Debug("ROUTER: Y({},{}) = %s" % y[k], k, j)
-        self.Debug('Tx = {}', tx)
-        self.Debug('Ty = {}', ty)
-        # x = self.router.route(10400, 152982, save=False)
-        # self.Debug("ROUTER: X = %s" % x)
-        # x = self.router.route(8234, 194358, save=False)
-        # self.Debug("ROUTER: X = %s" % x)
-
-    def test_reachable(self, find=True, delete=False):
-        if find:
-            res = self.router.test_reachable(44341)
-            if len(res) > 0:
-                with open('res.json', 'w') as f:
-                    f.write(json.dumps({'unreached': res}))
-            self.Notify('unreached {} points', len(res))
-        if delete:
-            with open('res.json') as f:
-                points = json.load(f)['unreached']
-            self.P.sql.execute(
-                UPDATE_UNREACHABLE.format(pts=','.join([str(i) for i in points])),
-                commit=True,
-            )
-
-    def start(self):
-        _t = time.time()
-        # self.test_relevante()
-        # self.test_route()
-        # self.test_nearest()
-        self.test_reachable(
-            find=False,
-            delete=True
-        )
-        self.Debug('time: {}', time.time() - _t)
-        self.P.stop()
-
-    def stop(self, wait):
-        pass
+    def stop(self, *args, **kwargs):
+        self.router.stop(args, **kwargs)
