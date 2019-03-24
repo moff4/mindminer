@@ -19,13 +19,20 @@ class Miner(Plugin):
     def save(self):
         self.router.save()
 
-    # tags - dict: tag => weight
-    def relevante(self, user_tags, post_tags, flag=True):
+    def relevante(self, user_tags, post_tags, top=False):
+        """
+            *_tags - dict: tag(str) => weight(float) or list of tags(str)
+            top - bool: use classic of fast(if possible) alg
+            tag - hashtag witghout '#' at the begining
+            return flaot
+        """
         def f(tags):
             return {tag: 1 for tag in tags} if isinstance(tags, tuple) or isinstance(tags, list) else tags
 
-        def q(tags):
+        def q(tags, top=False):
             return {
+                self.router.map_tag[tag][2]
+                if top and self.router.map_tag[tag][2] else
                 self.router.map_tag[tag][0]: tags[tag]
                 for tag in filter(
                     lambda x: x in self.router.map_tag,
@@ -33,10 +40,13 @@ class Miner(Plugin):
                 )
             }
 
+        self.Debug('Gonna run Miner{} alg', 'Top' if top else 'Original')
+
         user_tags = f(user_tags)
         post_tags = f(post_tags)
         user_profile = q(user_tags)
-        post_profile = q(post_tags)
+        post_profile = q(post_tags, top)
+
         if not user_profile or not post_profile:
             return 0.0
 

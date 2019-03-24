@@ -5,8 +5,6 @@ import time
 from kframe.base import Plugin
 from .queries import *
 
-from traceback import format_exc as Trace
-
 
 def add(d, i, j, v):
     if i not in d:
@@ -27,7 +25,20 @@ class Router(Plugin):
         self.RUN = True
         # self.P.sql.execute(CONVERT_MAP_TO_GRAPH, commit=True)
 
+    def reset(self, cache=True, map=True):
+        if cache:
+            self.cache = {}
+            self.used = set()
+        if map:
+            self.map_tag = {}
+            self.map_id = {}
+
     def _get_near(self, i, points, sure=None):
+        """
+            i - point to load now
+            points - list of points that might be loaded later
+            sure - sure filter
+        """
         lll = len(self.used)
         c = 0
         try:
@@ -56,20 +67,23 @@ class Router(Plugin):
                         add(self.cache, dst, src, (weight, sure))
                         c += 1
                     for i in bz:
+                        if i not in self.cache:
+                            self.cache[i] = {}
                         self.used.add(i)
         except Exception as e:
             self.Error('add near points: {}', e)
+            self.Trace('add near points:')
         if lll != len(self.used):
-            self.Debug('Cached has {} points ({}) in {}', len(self.used), c, time.time() - _t)
+            self.Debug('Cached has {} points ({}) in {:.4f}', len(self.used), c, time.time() - _t)
 
-    def cache_tags(self, tags):
+    def cache_tags(self, tags=None, ids=None, get_near=True):
         """
             tags - iterible
             load tuples (hashtag, tag_id, rank)
         """
         try:
-            for tag, _id, rank in self.P.sql.select(
-                SELECT_ALL_TAGS.format(
+            if tags:
+                query = SELECT_ALL_TAGS_BY_TAGS.format(
                     tags="','".join(
                         filter(
                             lambda x: x not in self.map_tag,
@@ -77,15 +91,29 @@ class Router(Plugin):
                         )
                     )
                 )
-            ):
+            elif ids:
+                query = SELECT_ALL_TAGS_BY_IDS.format(
+                    ids="','".join(
+                        [str(x) for x in ids if x not in self.map_id]
+                    )
+                )
+            elif ids is None and tags is None:
+                raise ValueError('cache-tags: tags or ids must be passed')
+            else:
+                return
+            l1 = len(self.map_tag)
+            t1 = time.time()
+            for tag, _id, rank, top in self.P.sql.select(query):
                 if type(tag) != str:
                     tag = tag.decode()
-                self.map_tag[tag] = (_id, rank)
-                self.map_id[_id] = (tag, rank)
-            self._get_near(None, self.map_id.keys())
+                self.map_tag[tag] = (_id, rank, top)
+                self.map_id[_id] = (tag, rank, top)
+            self.Debug('cached {} new tags in {:.4f}', len(self.map_tag) - l1, time.time() - t1)
+            if get_near:
+                self._get_near(None, self.map_id.keys())
         except Exception as e:
             self.Error('cache tags: {}', e)
-            self.Debug('cache tags: {}', Trace())
+            self.Trace('cache tags:')
 
     def insert_nearest(self):
         k = 0
@@ -106,7 +134,6 @@ class Router(Plugin):
 
     def _route(self, j, points, sure=None):
         best = None
-        # been = set()
         i = points[0][0]
         src = i
         self._get_near(i=j, points=[j, i], sure=sure)
@@ -138,10 +165,6 @@ class Router(Plugin):
                         best = already_weight
                 elif best is None or already_weight <= best:
                     for pt in self.cache.get(i, {}).keys():
-                        #  filter(
-                        #     lambda x: x not in been,
-                        #     self.cache.get(i, {}).keys()
-                        # ):
                         if pt in near_pt:
                             w = already_weight + self.cache[i][pt][0] + self.cache[j][pt][0]
                             if best is None or w < best:
@@ -149,81 +172,8 @@ class Router(Plugin):
                         w = already_weight + self.cache[i][pt][0]
                         if best is None or w < best:
                             points.append((pt, w))
-                        # been.add(pt)
         self.Debug('loops {} -> {}: {}', self.map_id[src][0], self.map_id[j][0], c)
         return best, True
-
-    def _route_many(self, desteny, i):
-        """
-            desteny - list or tuple of pts
-            return dict of weights and flag if there is need to save this data
-        """
-        res = {}
-        been = set()
-        self._get_near(i=None, points=[i] + list(desteny))
-        dst = {}
-        for j in desteny:
-            if j not in self.cache:
-                res[j] = None
-            if j in self.cache.get(i, {}):
-                dst[j] = self.cache[i][j][0]
-            elif i in self.cache.get(j, {}):
-                dst[j] = self.cache[j][i][0]
-            elif i == j:
-                dst[j] = 1.0 / len(self.cache[j])
-            else:
-                dst[j] = None
-        c = 0
-        points = [
-            (i, {
-                key: 0.0
-                for key in dst
-            })
-        ]
-        while len(points) > 0 and self.RUN:
-            c += 1
-            pts = list(map(lambda x: x[0], points))
-            new_pts = {}
-            i, al_w = points.pop(0)
-            for j in al_w:
-                if dst[j] is None or al_w[j] < dst[j]:
-                    self._get_near(i=i, points=pts)
-                    if j in self.cache.get(i, {}):
-                        w = al_w[j] + self.cache[i][j][0]
-                        if dst[j] is None or w < dst[j]:
-                            dst[j] = w
-                    elif i in self.cache.get(j, {}):
-                        w = al_w[j] + self.cache[j][i][0]
-                        if dst[j] is None or w < dst[j]:
-                            dst[j] = w
-                    elif i == j:
-                        if dst[j] is None or al_w[j] < dst[j]:
-                            dst[j] = al_w[j]
-                    elif dst[j] is None or al_w[j] <= dst[j]:
-                        for pt in filter(
-                            lambda x: x not in been,
-                            self.cache.get(i, {}).keys()
-                        ):
-                            if pt in self.cache.get(j, {}):
-                                w = al_w[j] + self.cache[i][pt][0] + self.cache[j][pt][0]
-                                if dst[j] is None or w < dst[j]:
-                                    dst[j] = w
-                            w = al_w[j] + self.cache[i][pt][0]
-                            if dst[j] is None or w < dst[j]:
-                                if pt not in new_pts:
-                                    new_pts[pt] = {j: w}
-                                else:
-                                    new_pts[pt].update({j: w})
-            for pt in new_pts:
-                points.append((pt, new_pts[pt]))
-                been.add(pt)
-        self.Debug('loops: {}', c)
-        res.update(dst)
-        return res, any(map(lambda x: dst[x] is not None, dst))
-
-    def route_many(self, i, dst, save=True):
-        dst, _ = self._route_many(desteny=dst, i=i)
-        return dst
 
     def route(self, i, j, save=True, sure=None):
         weight, _save = self._route(
@@ -268,10 +218,87 @@ class Router(Plugin):
                 self.to_save = {}
             except Exception as e:
                 self.Error('save: {}', e)
-                self.Debug('save: {}', Trace())
+                self.Trace('save:')
 
     def rank(self, point):
         return self.map_id[point][1] if point in self.map_id else None
+
+    def set_top(self, loops=None):
+        """
+            set top attribute to all tags
+        """
+        c = 0
+        pool = []
+        try:
+            while loops is None or loops > 0:
+                if loops:
+                    loops -= 1
+                top_save = {}
+                if pool:
+                    tags = list(pool)
+                    pool = []
+                else:
+                    tags = self.P.sql.select_all(
+                        SELECT_UNTOP_RANK_TAGS.format(
+                            limit=30,
+                        )
+                    )
+                if not tags:
+                    break
+                for hashtag, _id, rank, top in tags:
+                    self._get_near(i=_id, points=[_id])
+                    self.cache_tags(ids=list(self.cache[_id]), get_near=False)
+                    max_r = rank
+                    top_src = None
+                    for near_id in self.cache[_id]:
+                        r = self.rank(near_id)
+                        if r is None:
+                            self.Debug('rank for {} is None', near_id)
+                        elif r > max_r:
+                            max_r = r
+                            top_src = near_id
+                            # self.map_id[near_id][2]
+                    key = top_src if top_src is not None else _id
+                    if key in top_save:
+                        top_save[key].add(_id)
+                    else:
+                        top_save[key] = {_id}
+
+                # save result
+                for i in sorted(list(top_save), key=lambda x: len(top_save[x])):
+                    if len(top_save[i]) == 1:
+                        top_id = i
+                    elif i in top_save[i]:
+                        top_id = i
+                    elif self.map_id[i][2] is None:
+                        self.Warning('unexpected situation: i = {}'.format(i))
+                        # (tag, rank, top)
+                        pool.append((
+                            self.map_id[i][0],
+                            i,
+                            self.map_id[i][1],
+                            self.map_id[i][2],
+                        ))
+                        continue
+                    else:
+                        top_id = self.map_id[i][2]
+                    q = UPDATE_TAGS_TOP.format(
+                        top_id=top_id,
+                        id_cond=(
+                            'id = {}'.format(next(x for x in top_save[i]))
+                            if len(top_save[i]) == 1 else
+                            "id in ('{}')".format(
+                                "','".join([str(x) for x in top_save[i]])
+                            )
+                        )
+                    )
+                    if self.P.sql.execute(q, commit=True)[0]:
+                        c += len(top_save[i])
+                self.reset(map=True, cache=False)
+
+        except KeyboardInterrupt:
+            self.Notify('Stopping')
+        self.Notify('Topped {} tags', c)
 
     def stop(self, *args, **kwargs):
         self.RUN = False
