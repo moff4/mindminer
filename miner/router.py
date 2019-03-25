@@ -15,6 +15,7 @@ def add(d, i, j, v):
 
 
 class Router(Plugin):
+    name = 'router'
 
     def init(self):
         self.cache = {}

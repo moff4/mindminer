@@ -8,9 +8,10 @@ from .router import Router
 
 
 class Miner(Plugin):
+    name = 'miner'
 
     def init(self):
-        self.router = self.P.add_plugin(target=Router, key="router", autostart=False).init_plugin(key="router")
+        self.router = self.P.fast_init(target=Router)
         self.FATAL, self.errmsg = self.router.FATAL, self.router.errmsg
 
     def cache_tags(self, tags):
