@@ -26,6 +26,9 @@ class Router(Plugin):
         # self.P.sql.execute(CONVERT_MAP_TO_GRAPH, commit=True)
 
     def reset(self, cache=True, map=True):
+        """
+            reset cache
+        """
         if cache:
             self.cache = {}
             self.used = set()
